@@ -6,8 +6,8 @@
 // // import s3Client from "../config/s3.js";
 
 // // const YTDLP_PATH =
-// //   "/var/www/html/droppr.ai-backend/node_modules/yt-dlp-exec/bin/yt-dlp";
-// // const COOKIES_DIR = "/var/www/html/droppr.ai-backend";
+// //   "/var/www/html/Back-end/node_modules/yt-dlp-exec/bin/yt-dlp";
+// // const COOKIES_DIR = "/var/www/html/Back-end";
 
 // // /**
 // //  * Run yt-dlp command manually so we can pass --js-runtimes node
@@ -254,8 +254,8 @@
 // const execFileAsync = promisify(execFile);
 
 // const YTDLP_PATH =
-//   "/var/www/html/droppr.ai-backend/node_modules/yt-dlp-exec/bin/yt-dlp";
-// const COOKIES_DIR = "/var/www/html/droppr.ai-backend";
+//   "/var/www/html/Back-end/node_modules/yt-dlp-exec/bin/yt-dlp";
+// const COOKIES_DIR = "/var/www/html/Back-end";
 
 // /**
 //  * Run yt-dlp asynchronously with --js-runtimes node
@@ -533,7 +533,7 @@ const execFileAsync = promisify(execFile);
 // ===== AUTO-DETECT YT-DLP PATH =====
 const detectYtDlpPath = () => {
   const possiblePaths = [
-    "/var/www/html/droppr.ai-backend/node_modules/yt-dlp-exec/bin/yt-dlp",
+    "/var/www/html/Back-end/node_modules/yt-dlp-exec/bin/yt-dlp",
     "/usr/local/bin/yt-dlp",
     "/usr/bin/yt-dlp",
     path.join(process.cwd(), "node_modules/yt-dlp-exec/bin/yt-dlp"),
@@ -554,7 +554,7 @@ const detectYtDlpPath = () => {
 };
 
 const YTDLP_PATH = detectYtDlpPath();
-const COOKIES_DIR = "/var/www/html/droppr.ai-backend";
+const COOKIES_DIR = "/var/www/html/Back-end";
 
 /**
  * Run yt-dlp asynchronously with detailed debugging
