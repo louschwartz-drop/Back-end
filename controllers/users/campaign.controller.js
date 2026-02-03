@@ -83,50 +83,263 @@ export const createCampaignFromLink = async (req, res) => {
             },
         });
 
-        // Trigger extraction in background
+        // // Trigger extraction in background
+        // extractAndUploadAudio(userId, videoUrl)
+        //     .then(async (result) => {
+        //         const { audioUrl, videoThumbnail, title, description, creatorAttribution, localFilePath } = result;
+
+        //         // Update basic info
+        //         campaign.audioUrl = audioUrl;
+        //         if (videoThumbnail) campaign.videoThumbnail = videoThumbnail;
+
+        //         campaign.productCard = {
+        //             ...campaign.productCard,
+        //             creatorAttribution: creatorAttribution || null,
+        //             sourceVideoLink: videoUrl
+        //         };
+
+        //         await campaign.save();
+
+        //         // Start Transcription & Article Gen in background using the LOCAL file
+        //         // This is the Parallel Flow Optimization!
+        //         try {
+        //             await transcribeAndGenerate(campaign._id, {
+        //                 localFilePath,
+        //                 videoDescription: description || title
+        //             });
+        //             console.log(`[Flow] Parallel processing finished for campaign ${campaign._id}`);
+        //         } catch (aiError) {
+        //             console.error(`[Flow] AI processing failed:`, aiError);
+        //             campaign.status = "failed";
+        //             campaign.errorMessage = aiError.message || "AI processing failed";
+        //             await campaign.save();
+        //         } finally {
+        //             // CLEANUP: Done using the file for both S3 and AI
+        //             if (localFilePath && fs.existsSync(localFilePath)) {
+        //                 fs.unlinkSync(localFilePath);
+        //                 console.log(`[Flow] Cleaned up optimized local file: ${localFilePath}`);
+        //             }
+        //         }
+        //     })
+        //     .catch(async (error) => {
+        //         campaign.status = "failed";
+        //         campaign.errorMessage = `Extraction failed: ${error.message}`;
+        //         await campaign.save();
+        //         console.error(`Extraction failed:`, error);
+        //     });
+
+        // Trigger extraction in background with DETAILED DEBUGGING
+        console.log("\n╔═══════════════════════════════════════════════════════════╗");
+        console.log("║  🎬 STARTING BACKGROUND EXTRACTION PROCESS               ║");
+        console.log("╚═══════════════════════════════════════════════════════════╝");
+        console.log(`📋 Campaign ID: ${campaign._id}`);
+        console.log(`👤 User ID: ${userId}`);
+        console.log(`🔗 Video URL: ${videoUrl}`);
+        console.log(`⏰ Timestamp: ${new Date().toISOString()}\n`);
+
         extractAndUploadAudio(userId, videoUrl)
             .then(async (result) => {
+                console.log("\n┌──────────────────────────────────────────────────────┐");
+                console.log("│  ✅ EXTRACTION SUCCESSFUL - PROCESSING RESULT       │");
+                console.log("└──────────────────────────────────────────────────────┘");
+                console.log(`📋 Campaign ID: ${campaign._id}`);
+
                 const { audioUrl, videoThumbnail, title, description, creatorAttribution, localFilePath } = result;
 
+                console.log("\n📊 [RESULT] Extraction output:");
+                console.log(`   🔊 Audio URL: ${audioUrl}`);
+                console.log(`   🖼️  Thumbnail: ${videoThumbnail ? '✓ Present' : '✗ Missing'}`);
+                console.log(`   📌 Title: ${title?.substring(0, 50) || 'N/A'}...`);
+                console.log(`   📝 Description length: ${description?.length || 0} chars`);
+                console.log(`   👤 Creator: ${creatorAttribution || 'Unknown'}`);
+                console.log(`   📁 Local file: ${localFilePath || 'N/A'}\n`);
+
+                // Verify local file exists before proceeding
+                if (localFilePath) {
+                    if (fs.existsSync(localFilePath)) {
+                        const stats = fs.statSync(localFilePath);
+                        console.log(`✅ [FILE CHECK] Local file verified:`);
+                        console.log(`   Path: ${localFilePath}`);
+                        console.log(`   Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+                        console.log(`   Created: ${stats.birthtime}\n`);
+                    } else {
+                        console.error(`❌ [FILE CHECK] WARNING - Local file doesn't exist!`);
+                        console.error(`   Expected path: ${localFilePath}\n`);
+                    }
+                } else {
+                    console.warn(`⚠️  [FILE CHECK] No local file path provided\n`);
+                }
+
                 // Update basic info
-                campaign.audioUrl = audioUrl;
-                if (videoThumbnail) campaign.videoThumbnail = videoThumbnail;
+                console.log("💾 [DATABASE] Updating campaign with extraction results...");
 
-                campaign.productCard = {
-                    ...campaign.productCard,
-                    creatorAttribution: creatorAttribution || null,
-                    sourceVideoLink: videoUrl
-                };
+                try {
+                    campaign.audioUrl = audioUrl;
+                    console.log(`   ✓ Set audioUrl: ${audioUrl}`);
 
-                await campaign.save();
+                    if (videoThumbnail) {
+                        campaign.videoThumbnail = videoThumbnail;
+                        console.log(`   ✓ Set videoThumbnail: ${videoThumbnail}`);
+                    } else {
+                        console.log(`   ⚠️  videoThumbnail not set (not available)`);
+                    }
+
+                    campaign.productCard = {
+                        ...campaign.productCard,
+                        creatorAttribution: creatorAttribution || null,
+                        sourceVideoLink: videoUrl
+                    };
+                    console.log(`   ✓ Updated productCard`);
+                    console.log(`     - Creator: ${creatorAttribution || 'null'}`);
+                    console.log(`     - Source: ${videoUrl}`);
+
+                    await campaign.save();
+                    console.log(`✅ [DATABASE] Campaign saved successfully!\n`);
+
+                } catch (dbError) {
+                    console.error(`❌ [DATABASE] Failed to save campaign:`);
+                    console.error(`   Error: ${dbError.message}`);
+                    console.error(`   Stack: ${dbError.stack}\n`);
+                    throw dbError; // Re-throw to be caught by outer catch
+                }
 
                 // Start Transcription & Article Gen in background using the LOCAL file
-                // This is the Parallel Flow Optimization!
+                console.log("\n╔═══════════════════════════════════════════════════════════╗");
+                console.log("║  🤖 STARTING AI PROCESSING (PARALLEL FLOW)               ║");
+                console.log("╚═══════════════════════════════════════════════════════════╝");
+                console.log(`📋 Campaign ID: ${campaign._id}`);
+                console.log(`📁 Using local file: ${localFilePath || 'N/A'}`);
+                console.log(`📝 Video description: ${(description || title)?.substring(0, 50) || 'N/A'}...\n`);
+
                 try {
+                    console.log("🚀 [AI] Calling transcribeAndGenerate...");
+                    const aiStartTime = Date.now();
+
                     await transcribeAndGenerate(campaign._id, {
                         localFilePath,
                         videoDescription: description || title
                     });
-                    console.log(`[Flow] Parallel processing finished for campaign ${campaign._id}`);
+
+                    const aiDuration = ((Date.now() - aiStartTime) / 1000).toFixed(2);
+                    console.log(`\n✅ [AI] Processing complete! (${aiDuration}s)`);
+                    console.log(`📋 Campaign ID: ${campaign._id}`);
+                    console.log(`⏰ Finished at: ${new Date().toISOString()}\n`);
+
                 } catch (aiError) {
-                    console.error(`[Flow] AI processing failed:`, aiError);
-                    campaign.status = "failed";
-                    campaign.errorMessage = aiError.message || "AI processing failed";
-                    await campaign.save();
+                    console.error("\n╔═══════════════════════════════════════════════════════════╗");
+                    console.error("║  ❌ AI PROCESSING FAILED                                  ║");
+                    console.error("╚═══════════════════════════════════════════════════════════╝");
+                    console.error(`📋 Campaign ID: ${campaign._id}`);
+                    console.error(`⏰ Failed at: ${new Date().toISOString()}`);
+                    console.error(`❌ Error message: ${aiError.message}`);
+                    console.error(`📚 Error stack:\n${aiError.stack}\n`);
+
+                    console.log("💾 [DATABASE] Updating campaign status to 'failed'...");
+                    try {
+                        campaign.status = "failed";
+                        campaign.errorMessage = aiError.message || "AI processing failed";
+                        await campaign.save();
+                        console.log(`✅ [DATABASE] Campaign marked as failed\n`);
+                    } catch (dbError) {
+                        console.error(`❌ [DATABASE] Failed to update campaign status:`);
+                        console.error(`   Error: ${dbError.message}\n`);
+                    }
+
                 } finally {
                     // CLEANUP: Done using the file for both S3 and AI
-                    if (localFilePath && fs.existsSync(localFilePath)) {
-                        fs.unlinkSync(localFilePath);
-                        console.log(`[Flow] Cleaned up optimized local file: ${localFilePath}`);
+                    console.log("\n🗑️  [CLEANUP] Starting file cleanup...");
+
+                    if (localFilePath) {
+                        console.log(`   Checking: ${localFilePath}`);
+
+                        if (fs.existsSync(localFilePath)) {
+                            try {
+                                const stats = fs.statSync(localFilePath);
+                                const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+
+                                console.log(`   📊 File size: ${sizeMB} MB`);
+                                console.log(`   🗑️  Deleting...`);
+
+                                fs.unlinkSync(localFilePath);
+
+                                console.log(`   ✅ Successfully deleted: ${localFilePath}\n`);
+                            } catch (cleanupError) {
+                                console.error(`   ❌ Failed to delete file:`);
+                                console.error(`      Error: ${cleanupError.message}`);
+                                console.error(`      Path: ${localFilePath}\n`);
+                            }
+                        } else {
+                            console.log(`   ℹ️  File doesn't exist (already deleted or never created)\n`);
+                        }
+                    } else {
+                        console.log(`   ℹ️  No local file path to clean up\n`);
                     }
+
+                    console.log("╔═══════════════════════════════════════════════════════════╗");
+                    console.log("║  🏁 PARALLEL FLOW COMPLETED                              ║");
+                    console.log("╚═══════════════════════════════════════════════════════════╝");
+                    console.log(`📋 Campaign ID: ${campaign._id}`);
+                    console.log(`⏰ Completed at: ${new Date().toISOString()}\n`);
                 }
             })
             .catch(async (error) => {
-                campaign.status = "failed";
-                campaign.errorMessage = `Extraction failed: ${error.message}`;
-                await campaign.save();
-                console.error(`Extraction failed:`, error);
+                console.error("\n╔═══════════════════════════════════════════════════════════╗");
+                console.error("║  💥 EXTRACTION FAILED - CRITICAL ERROR                   ║");
+                console.error("╚═══════════════════════════════════════════════════════════╝");
+                console.error(`📋 Campaign ID: ${campaign._id}`);
+                console.error(`👤 User ID: ${userId}`);
+                console.error(`🔗 Video URL: ${videoUrl}`);
+                console.error(`⏰ Failed at: ${new Date().toISOString()}`);
+                console.error(`❌ Error type: ${error.name || 'Error'}`);
+                console.error(`❌ Error message: ${error.message}`);
+                console.error(`📚 Full stack trace:\n${error.stack}\n`);
+
+                // Log additional error properties if available
+                if (error.code) {
+                    console.error(`🔢 Error code: ${error.code}`);
+                }
+                if (error.errno) {
+                    console.error(`🔢 Error number: ${error.errno}`);
+                }
+                if (error.syscall) {
+                    console.error(`⚙️  System call: ${error.syscall}`);
+                }
+
+                console.log("\n💾 [DATABASE] Updating campaign status to 'failed'...");
+
+                try {
+                    campaign.status = "failed";
+                    campaign.errorMessage = `Extraction failed: ${error.message}`;
+
+                    console.log(`   Setting status: "failed"`);
+                    console.log(`   Setting errorMessage: "${error.message}"`);
+
+                    await campaign.save();
+
+                    console.log(`✅ [DATABASE] Campaign status updated successfully`);
+                    console.log(`   Campaign ID: ${campaign._id}`);
+                    console.log(`   New status: ${campaign.status}`);
+                    console.log(`   Error message: ${campaign.errorMessage}\n`);
+
+                } catch (dbError) {
+                    console.error(`❌ [DATABASE] CRITICAL - Failed to update campaign status:`);
+                    console.error(`   DB Error: ${dbError.message}`);
+                    console.error(`   DB Stack: ${dbError.stack}`);
+                    console.error(`   Campaign ID: ${campaign._id}`);
+                    console.error(`   ⚠️  Campaign may be stuck in intermediate state!\n`);
+                }
+
+                console.error("╔═══════════════════════════════════════════════════════════╗");
+                console.error("║  🛑 EXTRACTION PROCESS TERMINATED                        ║");
+                console.error("╚═══════════════════════════════════════════════════════════╝");
+                console.error(`📋 Final campaign status: ${campaign.status}`);
+                console.error(`⏰ Terminated at: ${new Date().toISOString()}\n`);
             });
+
+        console.log("\n✅ [FLOW] Background extraction triggered successfully");
+        console.log(`📋 Campaign ID: ${campaign._id}`);
+        console.log(`ℹ️  Process will continue in background...\n`);
+        console.log("═══════════════════════════════════════════════════════════\n");
 
         return res.status(201).json({
             success: true,
