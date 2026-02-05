@@ -11,6 +11,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
+      "https://www.droppr.ai",
       "http://dropprai.vercel.app",
       "https://dropprai.vercel.app",
       "http://localhost:3000",
