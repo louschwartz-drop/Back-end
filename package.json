@@ -1,6 +1,6 @@
 {
   "name": "droppr-ai-backend",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Droppr.ai Backend API",
   "main": "server.js",
   "type": "module",
